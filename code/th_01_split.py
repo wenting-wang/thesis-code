@@ -1,6 +1,12 @@
 import os
 import re
 
+"""
+split by side, and write to folder 'split_data'
+result-1: justices text, speaking to petitioner
+result-2: justices text, speaking to respondent
+"""
+
 
 def split_by_side(input_path, output_path):
 
@@ -49,9 +55,6 @@ def split_by_side(input_path, output_path):
             f.write("%s" % item)
 
 
-# split by side, and write to folder 'split_data'
-# result-1: justices text, speaking to petitioner
-# result-1: justices text, speaking to respondent
 project_path = '/home/wenting/PycharmProjects/thesis/'
 for year in range(1979, 2015):
     os.makedirs(project_path + 'data/split_data/%s' % year, exist_ok=True)
@@ -59,7 +62,7 @@ for year in range(1979, 2015):
 for root, dirs, files in os.walk(project_path + 'data/oral_arguments_text'):
     for file in files:
         if file.endswith(".cha"):
-            input_path = os.path.join(root, file)
-            output_path = re.sub('oral_arguments_text', 'split_data', input_path)
-            split_by_side(input_path, output_path)
+            input_dir = os.path.join(root, file)
+            output_dir = re.sub('oral_arguments_text', 'split_data', input_dir)
+            split_by_side(input_dir, output_dir)
 

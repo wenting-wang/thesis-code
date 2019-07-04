@@ -1,9 +1,11 @@
-import string, re, os, json
+import string
+import re
+import os
+import json
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
-# from nltk.stem import WordNetLemmatizer
-from pattern.en import lemma
+from nltk.stem import WordNetLemmatizer
 
 
 """
@@ -46,7 +48,7 @@ def get_text_per_justice(filepath):
     return dict_by_justices
 
 
-def clean(text, stem=False, lemm=True):
+def clean(text, stem=False, lemm=False):
     # text pre-processing
     tokens = [w.lower() for w in word_tokenize(text)]
     table = str.maketrans('', '', string.punctuation)
@@ -57,9 +59,8 @@ def clean(text, stem=False, lemm=True):
         porter = PorterStemmer()
         words = [porter.stem(word) for word in words]  # stemmed
     if lemm:
-        # lemmatizer = WordNetLemmatizer()
-        # words = [lemmatizer.lemmatize(word) for word in words]  # lemmatized
-        words = [lemma(word) for word in words]
+        lemma = WordNetLemmatizer()
+        words = [lemma.lemmatize(word) for word in words]  # lemmatized
 
     return ' '.join(words)
 
@@ -91,6 +92,6 @@ for year in range(1979, 2015):
 for root, dirs, files in os.walk(project_path + 'data/split_data'):
     for file in files:
         if file.endswith(("-result-1.txt", "-result-2.txt")):
-            input_dir = os.path.join(root, file)
-            output_dir = re.sub('split_data', 'cleaned_data', input_dir)
-            get_cleaned_text_per_justice(input_dir, output_dir)
+            input_file = os.path.join(root, file)
+            output_file = re.sub('split_data', 'cleaned_data', input_file)
+            get_cleaned_text_per_justice(input_file, output_file)

@@ -11,13 +11,6 @@
 4. 清洗数据（tockenized, alphabate only, filter out stop words, stemmed）
 保存到：/home/wenting/PycharmProjects/thesis/data/cleaned_data
 
-
-TODO:
-1. docket number, disposition
-2. sentiment score and disposition, check if correlated?
-3. text and disposition, if text predictable?
-4. text -> useful features?
-
 2019.07.02
 1. 学习面向对象程序设计（OOP）
 
@@ -92,3 +85,7 @@ TODO:
 #  '111']
 
 
+TODO:
+2. sentiment score and disposition, check if correlated?
+3. text and disposition, if text predictable?
+4. text -> useful features?

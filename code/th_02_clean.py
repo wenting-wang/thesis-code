@@ -2,10 +2,9 @@ import string, re, os, json
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
+# from nltk.stem import WordNetLemmatizer
+from pattern.en import lemma
 
-file_docket = '06-43'
-filename_1 = file_docket + '-result-1.txt'
-filename_2 = file_docket + '-result-2.txt'
 
 """
 clean text, categorize text to each justice, write to folder 'cleaned_data'.
@@ -47,15 +46,21 @@ def get_text_per_justice(filepath):
     return dict_by_justices
 
 
-def clean(text):
+def clean(text, stem=False, lemm=True):
     # text pre-processing
     tokens = [w.lower() for w in word_tokenize(text)]
     table = str.maketrans('', '', string.punctuation)
     stripped = [w.translate(table) for w in tokens]  # remove punctuation
     words = [word for word in stripped if word.isalpha()]  # remove non-alphabetic
     words = [w for w in words if w not in set(stopwords.words('english'))]  # filter out stop words
-    porter = PorterStemmer()
-    words = [porter.stem(word) for word in words]  # stemmed
+    if stem:
+        porter = PorterStemmer()
+        words = [porter.stem(word) for word in words]  # stemmed
+    if lemm:
+        # lemmatizer = WordNetLemmatizer()
+        # words = [lemmatizer.lemmatize(word) for word in words]  # lemmatized
+        words = [lemma(word) for word in words]
+
     return ' '.join(words)
 
 
@@ -75,7 +80,8 @@ def get_cleaned_text_per_justice(input_path, output_path):
         else:
             pass  # some justice did not speak
     with open(output_path, 'w') as f:
-        f.write(json.dumps(cleaned_text_per_justice))  # use `json.loads` to do the reverse
+        json.dump(cleaned_text_per_justice, f)
+        # f.write(json.dumps(cleaned_text_per_justice))
 
 
 project_path = '/home/wenting/PycharmProjects/thesis/'

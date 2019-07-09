@@ -3,25 +3,13 @@
 # https://machinelearningmastery.com/develop-word-embeddings-python-gensim/
 # https://github.com/keras-team/keras/blob/master/examples/pretrained_word_embeddings.py
 
-# from gensim.scripts.glove2word2vec import glove2word2vec
-# glove_input_file = 'glove.6B.100d.txt'
-# word2vec_output_file = 'glove.6B.100d.txt.word2vec'
-# glove2word2vec(glove_input_file, word2vec_output_file)
-#
-# from gensim.models import KeyedVectors
-# # load the Stanford GloVe model
-# filename = 'glove.6B.100d.txt.word2vec'
-# model = KeyedVectors.load_word2vec_format(filename, binary=False)
-# # calculate: (king - man) + woman = ?
-# result = model.most_similar(positive=['woman', 'king'], negative=['man'], topn=1)
-# print(result)
-
-
 from __future__ import print_function
 
 import os
 import sys
 import numpy as np
+import matplotlib.pyplot as plt
+import keras
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
@@ -30,13 +18,12 @@ from keras.layers import Conv1D, MaxPooling1D, Embedding
 from keras.models import Model
 from keras.initializers import Constant
 
-
-BASE_DIR = ''
-GLOVE_DIR = os.path.join(BASE_DIR, 'glove.42B')  # glove.6B
-TEXT_DATA_DIR = os.path.join(BASE_DIR, '20_newsgroup')
+BASE_DIR = '/home/wenting/PycharmProjects/thesis/'
+GLOVE_DIR = os.path.join(BASE_DIR, 'glove.6B')  # glove.6B
+TEXT_DATA_DIR = os.path.join(BASE_DIR, 'data/prepared_data_petitioner/')  # Change
 MAX_SEQUENCE_LENGTH = 1000
 MAX_NUM_WORDS = 20000
-EMBEDDING_DIM = 300  # 100
+EMBEDDING_DIM = 100  # 300
 VALIDATION_SPLIT = 0.2
 
 # first, build index mapping words in the embeddings set
@@ -45,7 +32,7 @@ VALIDATION_SPLIT = 0.2
 print('Indexing word vectors.')
 
 embeddings_index = {}
-with open(os.path.join(GLOVE_DIR, 'glove.42B.300d.txt')) as f:  # glove.6B.100d
+with open(os.path.join(GLOVE_DIR, 'glove.6B.100d.txt')) as f:  # glove.6B.100d
     for line in f:
         word, coefs = line.split(maxsplit=1)
         coefs = np.fromstring(coefs, 'f', sep=' ')
@@ -65,16 +52,16 @@ for name in sorted(os.listdir(TEXT_DATA_DIR)):
         label_id = len(labels_index)
         labels_index[name] = label_id
         for fname in sorted(os.listdir(path)):
-            if fname.isdigit():
-                fpath = os.path.join(path, fname)
-                args = {} if sys.version_info < (3,) else {'encoding': 'latin-1'}
-                with open(fpath, **args) as f:
-                    t = f.read()
-                    i = t.find('\n\n')  # skip header
-                    if 0 < i:
-                        t = t[i:]
-                    texts.append(t)
-                labels.append(label_id)
+            # if fname.isdigit():
+            fpath = os.path.join(path, fname)
+            args = {} if sys.version_info < (3,) else {'encoding': 'utf-8'}
+            with open(fpath, **args) as f:
+                t = f.read()
+                # i = t.find('\n\n')  # skip header
+                # if 0 < i:
+                #     t = t[i:]
+                texts.append(t)
+            labels.append(label_id)
 
 print('Found %s texts.' % len(texts))
 
@@ -137,14 +124,72 @@ x = MaxPooling1D(5)(x)
 x = Conv1D(128, 5, activation='relu')(x)
 x = GlobalMaxPooling1D()(x)
 x = Dense(128, activation='relu')(x)
-preds = Dense(len(labels_index), activation='softmax')(x)
-
+# preds = Dense(len(labels_index), activation='softmax')(x)
+preds = Dense(1, activation='sigmoid')(x)
 model = Model(sequence_input, preds)
-model.compile(loss='categorical_crossentropy',
+
+# callbacks setting
+# $ mkdir /home/wenting/PycharmProjects/thesis/log_dir
+# $ tensorboard --logdir=/home/wenting/PycharmProjects/thesis/log_dir
+
+callbacks_list = [
+    keras.callbacks.EarlyStopping(
+        monitor='acc',
+        patience=1,
+    ),
+    keras.callbacks.ModelCheckpoint(
+        filepath=BASE_DIR + 'model/' + 'model.h5',
+        monitor='val_loss',
+        save_best_only=True,
+    ),
+    keras.callbacks.ReduceLROnPlateau(
+        monitor='val_loss',
+        factor=0.1,
+        patience=10,
+    ),
+    keras.callbacks.TensorBoard(
+        log_dir=BASE_DIR + 'log_dir',
+        histogram_freq=1,
+    )
+]
+
+# compile and fit model
+
+model.compile(loss='binary_crossentropy',
               optimizer='rmsprop',
               metrics=['acc'])
 
-model.fit(x_train, y_train,
-          batch_size=128,
-          epochs=10,
-          validation_data=(x_val, y_val))
+history = model.fit(x_train, y_train,
+                    batch_size=128,
+                    epochs=10,
+                    callbacks=callbacks_list,
+                    validation_data=(x_val, y_val))
+
+print('plot the loss and accuracy graph')
+
+
+# draw graph
+def draw_graph():
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    acc = history.history['acc']
+    val_acc = history.history['val_acc']
+
+    epochs = range(1, len(loss) + 1)
+
+    plt.plot(epochs, loss, 'bo', label='Training loss')
+    plt.plot(epochs, val_loss, 'b', label='Validation loss')
+    plt.title('Training and validation loss')
+    plt.legend()
+
+    plt.figure()
+
+    plt.plot(epochs, acc, 'bo', label='Training acc')
+    plt.plot(epochs, val_acc, 'b', label='Validation acc')
+    plt.title('Training and validation accuracy')
+    plt.legend()
+
+    plt.show()
+
+
+draw_graph()

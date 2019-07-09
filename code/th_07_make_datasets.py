@@ -2,6 +2,8 @@ import json
 import re
 import os
 import pandas as pd
+import numpy as np
+from sklearn.preprocessing import OneHotEncoder
 
 
 def get_text(file):
@@ -38,3 +40,33 @@ text_df = pd.DataFrame({'docket': docket_list,
                         'respondent': respondent_list})
 case_centered_dataset = pd.merge(case_centered_docket_result, text_df, on=['docket'], how='left')
 case_centered_dataset.to_csv(project_path + 'data/target_data/case_centered_dataset.csv', index=False)
+
+# rewrite dataset (by partyWinning)
+# 0	no favorable disposition for petitioning party apparent (respondent win)
+# 1	petitioning party received a favorable disposition (petitioner win)
+# 2	favorable disposition for petitioning party unclear (unclear) -> delete
+
+# delete docket with missing disposition
+# labels[labels.isna() == True]
+# case_centered_docket_result.iloc[535,:]
+# 535   NaN
+# 591   NaN
+# 599   NaN
+
+# labels = case_centered_docket_result['partyWinning'].astype(int)
+# # pd.Series(labels).value_counts()
+# # 1    2173
+# # 0    1333
+# # 2       1 -> delete (00-878,9.0,2.0)
+# labels = np.array(labels).reshape(len(labels), -1)
+# enc = OneHotEncoder(categories='auto')
+# enc.fit(labels)
+# targets = enc.transform(labels).toarray()
+#
+# new_df = case_centered_dataset.assign(partyWinning_0=pd.Series(targets[:0]).values)
+# new_df = new_df.assign(partyWinning_1=pd.Series(targets[:1]).values)
+# new_df = new_df.assign(partyWinning_2=pd.Series(targets[:2]).values)
+#
+# new_df.to_csv(project_path + 'data/target_data/case_centered_dataset_2.csv', index=False)
+
+# UPDATE: NO NEED FOR ONE HOT ENCODING

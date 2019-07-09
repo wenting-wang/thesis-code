@@ -76,7 +76,7 @@ def get_cleaned_text_per_justice(input_path, output_path):
     for key, value in dict_argument.items():
         if value:
             text_by_justices = ' '.join(value)
-            cleaned_text = clean(text_by_justices)
+            cleaned_text = clean(text_by_justices, lemm=True)  # choose if lemma
             cleaned_text_per_justice[key].append(cleaned_text)
         else:
             pass  # some justice did not speak
@@ -87,11 +87,11 @@ def get_cleaned_text_per_justice(input_path, output_path):
 
 project_path = '/home/wenting/PycharmProjects/thesis/'
 for year in range(1979, 2015):
-    os.makedirs(project_path + 'data/cleaned_data/%s' % year, exist_ok=True)
+    os.makedirs(project_path + 'data/cleaned_data_lemma/%s' % year, exist_ok=True)  # choose folder
 
 for root, dirs, files in os.walk(project_path + 'data/split_data'):
     for file in files:
         if file.endswith(("-result-1.txt", "-result-2.txt")):
             input_file = os.path.join(root, file)
-            output_file = re.sub('split_data', 'cleaned_data', input_file)
+            output_file = re.sub('split_data', 'cleaned_data_lemma', input_file)  # choose folder
             get_cleaned_text_per_justice(input_file, output_file)

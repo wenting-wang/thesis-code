@@ -15,16 +15,17 @@ from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
 from keras.layers import Dense, Input, GlobalMaxPooling1D
 from keras.layers import Conv1D, MaxPooling1D, Embedding
+from keras.layers import GRU
 from keras.models import Model
 from keras.initializers import Constant
 
 BASE_DIR = '/home/wenting/PycharmProjects/thesis/'
 GLOVE_DIR = os.path.join(BASE_DIR, 'glove.6B')  # glove.6B
-TEXT_DATA_DIR = os.path.join(BASE_DIR, 'data/prepared_data_petitioner/')  # Change
+TEXT_DATA_DIR = os.path.join(BASE_DIR, 'data/prepared_data_respondent/')  # Change
 MAX_SEQUENCE_LENGTH = 1000
 MAX_NUM_WORDS = 20000
 EMBEDDING_DIM = 100  # 300
-VALIDATION_SPLIT = 0.2
+VALIDATION_SPLIT = 0.35
 
 # first, build index mapping words in the embeddings set
 # to their embedding vector
@@ -75,7 +76,8 @@ print('Found %s unique tokens.' % len(word_index))
 
 data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
 
-labels = to_categorical(np.asarray(labels))
+# labels = to_categorical(np.asarray(labels))
+labels = np.asarray(labels)
 print('Shape of data tensor:', data.shape)
 print('Shape of label tensor:', labels.shape)
 
@@ -117,25 +119,26 @@ print('Training model.')
 # train a 1D convnet with global maxpooling
 sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
 embedded_sequences = embedding_layer(sequence_input)
-x = Conv1D(128, 5, activation='relu')(embedded_sequences)
+
+x = Conv1D(32, 5, activation='relu')(embedded_sequences)
 x = MaxPooling1D(5)(x)
-x = Conv1D(128, 5, activation='relu')(x)
-x = MaxPooling1D(5)(x)
-x = Conv1D(128, 5, activation='relu')(x)
-x = GlobalMaxPooling1D()(x)
-x = Dense(128, activation='relu')(x)
-# preds = Dense(len(labels_index), activation='softmax')(x)
+x = Conv1D(32, 5, activation='relu')(x)
+x = GRU(32, dropout=0.1, recurrent_dropout=0.5)(x)
 preds = Dense(1, activation='sigmoid')(x)
+# preds = Dense(len(labels_index), activation='softmax')(x)
+
 model = Model(sequence_input, preds)
 
 # callbacks setting
 # $ mkdir /home/wenting/PycharmProjects/thesis/log_dir
+# $ conda activate nlp
+# $ rm /home/wenting/PycharmProjects/thesis/log_dir/*
 # $ tensorboard --logdir=/home/wenting/PycharmProjects/thesis/log_dir
 
 callbacks_list = [
     keras.callbacks.EarlyStopping(
-        monitor='acc',
-        patience=1,
+        monitor='val_loss',
+        patience=5,
     ),
     keras.callbacks.ModelCheckpoint(
         filepath=BASE_DIR + 'model/' + 'model.h5',
@@ -161,7 +164,7 @@ model.compile(loss='binary_crossentropy',
 
 history = model.fit(x_train, y_train,
                     batch_size=128,
-                    epochs=10,
+                    epochs=50,
                     callbacks=callbacks_list,
                     validation_data=(x_val, y_val))
 
@@ -170,6 +173,7 @@ print('plot the loss and accuracy graph')
 
 # draw graph
 def draw_graph():
+    plt.clf()
     loss = history.history['loss']
     val_loss = history.history['val_loss']
     acc = history.history['acc']

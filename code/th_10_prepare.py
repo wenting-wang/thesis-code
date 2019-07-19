@@ -65,6 +65,8 @@ msk = np.random.rand(len(argument)) < 0.9
 experiment = argument[msk]
 test = argument[~msk]
 
+experiment = experiment.drop('docket', axis=1)
+
 msk2 = np.random.rand(len(experiment)) < 0.75
 train = experiment[msk2]
 dev = experiment[~msk2]
@@ -73,6 +75,7 @@ train.to_csv('/home/wenting/Documents/bert/data/argument/pair/train.tsv', header
                 sep='\t', index=False, encoding='utf-8')
 dev.to_csv('/home/wenting/Documents/bert/data/argument/pair/dev.tsv', header=True,
                 sep='\t', index=False, encoding='utf-8')
+test = test.drop('partyWinning', axis=1)
 test.to_csv('/home/wenting/Documents/bert/data/argument/pair/test.tsv', header=True,
                 sep='\t', index=False, encoding='utf-8')
 

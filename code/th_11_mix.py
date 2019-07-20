@@ -56,10 +56,10 @@ print("[INFO] processing data...")
 split = train_test_split(info_processed, texts_pad, test_size=0.25, random_state=42)
 (trainAttrX, testAttrX, trainTextX, testTextX) = split
 
-trainTextX_pe = trainTextX[0]
-trainTextX_re = trainTextX[1]
-testTextX_pe = testTextX[0]
-testTextX_re = testTextX[1]
+trainTextX_pe = trainTextX[:, :, 0]
+trainTextX_re = trainTextX[:, :, 1]
+testTextX_pe = testTextX[:, :, 0]
+testTextX_re = testTextX[:, :, 1]
 
 # target
 trainY = trainAttrX['partyWinning']

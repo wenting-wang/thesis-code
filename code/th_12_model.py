@@ -23,15 +23,15 @@ def create_mlp(dim, regress=False):
     return model
 
 
-def create_cnn(max_num_words, max_sequence_length, embedding_dim, embedding_matrix, regress=False):
+def create_cnn(max_num_words, max_length, embedding_dim, embedding_matrix, regress=False):
     # load pre-trained embedding
     embedding_layer = Embedding(max_num_words,
                                 embedding_dim,
                                 embeddings_initializer=Constant(embedding_matrix),
-                                input_length=max_sequence_length,
+                                input_length=max_length,
                                 trainable=False)
 
-    sequence_input = Input(shape=(max_sequence_length,), dtype='int32')
+    sequence_input = Input(shape=(max_length,), dtype='int32')
     embedded_sequences = embedding_layer(sequence_input)
 
     x = Conv1D(filters=32, kernel_size=3, padding='same', activation='relu')(embedded_sequences)

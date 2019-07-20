@@ -23,9 +23,9 @@ def create_mlp(dim, regress=False):
     return model
 
 
-def create_cnn(max_num_words, max_length, embedding_dim, embedding_matrix, regress=False):
+def create_cnn(num_words, max_length, embedding_dim, embedding_matrix, regress=False):
     # load pre-trained embedding
-    embedding_layer = Embedding(max_num_words,
+    embedding_layer = Embedding(num_words,
                                 embedding_dim,
                                 embeddings_initializer=Constant(embedding_matrix),
                                 input_length=max_length,

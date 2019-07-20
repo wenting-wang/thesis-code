@@ -72,9 +72,9 @@ testAttrX = testAttrX.drop(['partyWinning'], axis=1)
 # create the MLP and CNN models
 print("[INFO] building model...")
 mlp = th_12_model.create_mlp(trainAttrX.shape[1], regress=False)
-cnn_pe = th_12_model.create_cnn(max_num_words=MAX_NUM_WORDS, max_length=MAX_LENGTH,
+cnn_pe = th_12_model.create_cnn(num_words=num_words, max_length=MAX_LENGTH,
                                 embedding_dim=EMBEDDING_DIM, embedding_matrix=embedding_matrix, regress=False)
-cnn_re = th_12_model.create_cnn(max_num_words=MAX_NUM_WORDS, max_length=MAX_LENGTH,
+cnn_re = th_12_model.create_cnn(num_words=num_words, max_length=MAX_LENGTH,
                                 embedding_dim=EMBEDDING_DIM, embedding_matrix=embedding_matrix, regress=False)
 
 # create the input to our final set of layers as the *output* of both

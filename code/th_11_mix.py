@@ -13,8 +13,8 @@ from keras.callbacks import EarlyStopping
 from keras.callbacks import ModelCheckpoint
 
 # embedding settings
-MAX_NUM_WORDS = 5000
-MAX_LENGTH = 500
+MAX_NUM_WORDS = 20000
+MAX_LENGTH = 1000
 EMBEDDING_DIM = 100
 BASE_DIR = '/home/wenting/PycharmProjects/thesis/'
 GLOVE_DIR = os.path.join(BASE_DIR, 'glove.6B')  # glove.6B

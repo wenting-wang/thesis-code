@@ -99,7 +99,7 @@ print(model.summary())
 
 # simple early stopping
 best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model/best_model.h5'
-es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=50)
+es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10)
 mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
 # fit model
 print("[INFO] training model...")
@@ -109,8 +109,8 @@ history = model.fit(
     epochs=5, batch_size=16, verbose=0, callbacks=[es, mc])
 
 # evaluate the model
-_, train_acc = model.evaluate(trainAttrX, trainTextX_pe, trainTextX_re, verbose=0)
-_, test_acc = model.evaluate(testAttrX, testTextX_pe, testTextX_re, verbose=0)
+_, train_acc = model.evaluate([trainAttrX, trainTextX_pe, trainTextX_re], trainY, verbose=0)
+_, test_acc = model.evaluate([testAttrX, testTextX_pe, testTextX_re], testY, verbose=0)
 print('Train: %.3f, Test: %.3f' % (train_acc, test_acc))
 
 # load the saved model

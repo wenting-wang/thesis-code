@@ -76,7 +76,7 @@ def load_structured_data(info_file):
     docket_justice_id = info['docket'].map(str) + '_' + info['justice'].map(str)
     info['docket_justice_id'] = docket_justice_id
     info = info.sort_values(by=['docket_justice_id'])  # sort, order
-    info = info.drop(['docket_justice_id']).fillna(0)
+    info = info.drop(['docket_justice_id'], axis=1).fillna(0)
 
     # one-hot-encoding
     for col in info.columns:
@@ -154,7 +154,7 @@ def load_audio_data(audio_file):
     docket_justice_id = audio['docket'].map(str) + '_' + audio['justice'].map(str)
     audio['docket_justice_id'] = docket_justice_id
     audio = audio.sort_values(by=['docket_justice_id'])  # sort, order
-    audio = audio.drop(['docket_justice_id']).fillna(0)
+    audio = audio.drop(['docket_justice_id'], axis=1).fillna(0)
     return audio[['petitioner_pitch', 'respondent_pitch']]
 
 # add other audio files later

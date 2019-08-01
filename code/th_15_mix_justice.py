@@ -1,9 +1,10 @@
 import sys
 sys.path.append('/home/wenting/PycharmProjects/thesis/code')
 import os
-import th_13_mix_data
-import th_12_model
+import th_17_mix_data_justice
+import th_16_model_justice
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from keras.layers.core import Dense
 from keras.models import Model
@@ -11,24 +12,36 @@ from keras.optimizers import Adam
 from keras.layers import concatenate
 from keras.callbacks import EarlyStopping
 from keras.callbacks import ModelCheckpoint
+import matplotlib.pyplot as plt
 
 # embedding settings
 MAX_NUM_WORDS = 20000
-MAX_LENGTH = 1000
+MAX_LENGTH = 400  # change
 EMBEDDING_DIM = 100
 BASE_DIR = '/home/wenting/PycharmProjects/thesis/'
 GLOVE_DIR = os.path.join(BASE_DIR, 'glove.6B')  # glove.6B
 
+# load the saved model
+# from keras.models import load_model
+# saved_model = load_model('best_model.h5')
+
+
 # load data
-info_file = '/home/wenting/PycharmProjects/thesis/data/mixed_data/caseinfo.csv'
-arguments_file_dir = '/home/wenting/PycharmProjects/thesis/data/mixed_data/text_data'
+info_file = '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/case_info_justice_filtered.csv'
+arguments_file_dir = '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/text_data_justice_filtered'
+audio_file = '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/audio_filtered.csv'
 
 print("[INFO] loading cases attributes csv...")
-info_processed = th_13_mix_data.load_structured_data(info_file)
+info_processed = th_17_mix_data_justice.load_structured_data(info_file)
+
+print("[INFO] loading audio pitch...")
+audio = th_17_mix_data_justice.load_audio_data(audio_file)
+info_and_audio = pd.concat([info_processed, audio], axis=1)
 
 print("[INFO] loading oral arguments text...")
-oral_data = th_13_mix_data.load_arguments_text(info_file, arguments_file_dir, MAX_NUM_WORDS, MAX_LENGTH)
+oral_data = th_17_mix_data_justice.load_arguments_text(info_file, arguments_file_dir, MAX_NUM_WORDS, MAX_LENGTH)
 texts_pad, word_index = oral_data
+
 
 # GloVe embedding preparing
 # indexing word vectors
@@ -51,68 +64,363 @@ for word, i in word_index.items():
         # words not found in embedding index will be all-zeros.
         embedding_matrix[i] = embedding_vector
 
-# split data
-print("[INFO] processing data...")
-split = train_test_split(info_processed, texts_pad, test_size=0.25, random_state=42)
-(trainAttrX, testAttrX, trainTextX, testTextX) = split
 
+# split data
+# train, val, test: 0.64, 0.16, 0.2
+print("[INFO] processing data...")
+trainAttrX, testAttrX, trainTextX, testTextX = train_test_split(info_and_audio, texts_pad, test_size=0.2, random_state=1)
+trainAttrX, valAttrX, trainTextX, valTextX = train_test_split(trainAttrX, trainTextX, test_size=0.2, random_state=1)
+
+# text
 trainTextX_pe = trainTextX[:, :, 0]
 trainTextX_re = trainTextX[:, :, 1]
 testTextX_pe = testTextX[:, :, 0]
 testTextX_re = testTextX[:, :, 1]
+valTextX_pe = valTextX[:, :, 0]
+valTextX_re = valTextX[:, :, 1]
 
 # target
-trainY = trainAttrX['partyWinning']
-testY = testAttrX['partyWinning']
+trainY = trainAttrX['petitioner_vote']
+testY = testAttrX['petitioner_vote']
+valY = valAttrX['petitioner_vote']
+
+# audio
+trainAudioX_pe = trainAttrX['petitioner_pitch']
+trainAudioX_re = trainAttrX['respondent_pitch']
+testAudioX_pe = testAttrX['petitioner_pitch']
+testAudioX_re = testAttrX['respondent_pitch']
+valAudioX_pe = valAttrX['petitioner_pitch']
+valAudioX_re = valAttrX['respondent_pitch']
 
 # structured data
-trainAttrX = trainAttrX.drop(['partyWinning'], axis=1)
-testAttrX = testAttrX.drop(['partyWinning'], axis=1)
-
-# create the MLP and CNN models
-print("[INFO] building model...")
-mlp = th_12_model.create_mlp(trainAttrX.shape[1], regress=False)
-cnn_pe = th_12_model.create_cnn(num_words=num_words, max_length=MAX_LENGTH,
-                                embedding_dim=EMBEDDING_DIM, embedding_matrix=embedding_matrix, regress=False)
-cnn_re = th_12_model.create_cnn(num_words=num_words, max_length=MAX_LENGTH,
-                                embedding_dim=EMBEDDING_DIM, embedding_matrix=embedding_matrix, regress=False)
-
-# create the input to our final set of layers as the *output* of both
-# the MLP and CNN
-combinedInput = concatenate([mlp.output, cnn_pe.output, cnn_re.output])
-
-# our final FC layer head will have two dense layers, the final one
-# being our regression head
-x = Dense(4, activation='relu')(combinedInput)
-x = Dense(1, activation='sigmoid')(x)
-
-# build model
-model = Model(inputs=[mlp.input, cnn_pe.input, cnn_re.input], outputs=x)
-
-# compile the model using mean absolute percentage error as our loss
-opt = Adam(lr=1e-3, decay=1e-3 / 200)
-model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
-
-print("[INFO] model summary...")
-print(model.summary())
+trainAttrX = trainAttrX.drop(['petitioner_vote', 'petitioner_pitch', 'respondent_pitch'], axis=1)
+testAttrX = testAttrX.drop(['petitioner_vote', 'petitioner_pitch', 'respondent_pitch'], axis=1)
+valAttrX = valAttrX.drop(['petitioner_vote', 'petitioner_pitch', 'respondent_pitch'], axis=1)
 
 
-# simple early stopping
-best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model/best_model.h5'
-es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=50)
-mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
-# fit model
-print("[INFO] training model...")
-history = model.fit(
-    [trainAttrX, trainTextX_pe, trainTextX_re], trainY,
-    validation_data=([testAttrX, testTextX_pe, testTextX_re], testY),
-    epochs=5, batch_size=16, verbose=0, callbacks=[es, mc])
+def draw_graph():
+    plt.clf()
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    acc = history.history['acc']
+    val_acc = history.history['val_acc']
 
-# evaluate the model
-_, train_acc = model.evaluate(trainAttrX, trainTextX_pe, trainTextX_re, verbose=0)
-_, test_acc = model.evaluate(testAttrX, testTextX_pe, testTextX_re, verbose=0)
-print('Train: %.3f, Test: %.3f' % (train_acc, test_acc))
+    epochs = range(1, len(loss) + 1)
 
-# load the saved model
-# from keras.models import load_model
-# saved_model = load_model('best_model.h5')
+    plt.plot(epochs, loss, 'bo', label='Training loss')
+    plt.plot(epochs, val_loss, 'b', label='Validation loss')
+    plt.title('Training and validation loss')
+    plt.legend()
+
+    plt.figure()
+
+    plt.plot(epochs, acc, 'bo', label='Training acc')
+    plt.plot(epochs, val_acc, 'b', label='Validation acc')
+    plt.title('Training and validation accuracy')
+    plt.legend()
+
+    plt.show()
+
+
+def run_info():
+    print("[INFO] building model...")
+    mlp = th_16_model_justice.create_mlp(trainAttrX.shape[1], regress=True)
+    model = Model(inputs=mlp.input, outputs=mlp.output)
+
+    # compile the model using mean absolute percentage error as our loss
+    opt = Adam(lr=1e-3, decay=1e-3 / 200)
+    model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+
+    print("[INFO] model summary...")
+    print(model.summary())
+
+    # simple early stopping
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
+    mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
+    # fit model
+    print("[INFO] training model...")
+    history = model.fit(
+        trainAttrX, trainY,
+        validation_data=(valAttrX, valY),
+        epochs=5, batch_size=16, verbose=0, callbacks=[es, mc])
+
+    # evaluate the model
+    _, train_acc = model.evaluate(trainAttrX, trainY, verbose=0)
+    _, val_acc = model.evaluate(valAttrX, valY, verbose=0)
+    _, test_acc = model.evaluate(testAttrX, testY, verbose=0)
+
+    print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
+
+
+def run_text():
+    # create the MLP and CNN models
+    print("[INFO] building model...")
+    cnn_pe = th_16_model_justice.create_cnn(num_words=num_words, max_length=MAX_LENGTH,
+                                            embedding_dim=EMBEDDING_DIM, embedding_matrix=embedding_matrix, regress=False)
+    cnn_re = th_16_model_justice.create_cnn(num_words=num_words, max_length=MAX_LENGTH,
+                                            embedding_dim=EMBEDDING_DIM, embedding_matrix=embedding_matrix, regress=False)
+
+    # create the input to our final set of layers as the *output* of both
+    # the MLP and CNN
+    combinedInput = concatenate([cnn_pe.output, cnn_re.output])
+
+    # our final FC layer head will have two dense layers, the final one
+    # being our regression head
+    x = Dense(4, activation='relu')(combinedInput)
+    x = Dense(1, activation='sigmoid')(x)
+
+    # build model
+    model = Model(inputs=[cnn_pe.input, cnn_re.input], outputs=x)
+
+    # compile the model using mean absolute percentage error as our loss
+    opt = Adam(lr=1e-3, decay=1e-3 / 200)
+    model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+
+    print("[INFO] model summary...")
+    print(model.summary())
+
+    # simple early stopping
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
+    mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
+    # fit model
+    print("[INFO] training model...")
+    history = model.fit(
+        [trainTextX_pe, trainTextX_re], trainY,
+        validation_data=([valTextX_pe, valTextX_re], valY),
+        epochs=5, batch_size=16, verbose=0, callbacks=[es, mc])
+
+    # evaluate the model
+    _, train_acc = model.evaluate([trainTextX_pe, trainTextX_re], trainY, verbose=0)
+    _, val_acc = model.evaluate([valTextX_pe, valTextX_re], valY, verbose=0)
+    _, test_acc = model.evaluate([testTextX_pe, testTextX_re], testY, verbose=0)
+
+    print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
+
+
+def run_audio():
+    # create the MLP
+    print("[INFO] building model...")
+    mlp_pe = th_16_model_justice.create_mlp_audio(1, regress=False)
+    mlp_re = th_16_model_justice.create_mlp_audio(1, regress=False)
+
+    combinedInput = concatenate([mlp_pe.output, mlp_re.output])
+
+    x = Dense(2, activation='relu')(combinedInput)
+    x = Dense(1, activation='sigmoid')(x)
+
+    # build model
+    model = Model(inputs=[mlp_pe.input, mlp_re.input], outputs=x)
+
+    # compile the model using mean absolute percentage error as our loss
+    opt = Adam(lr=1e-3, decay=1e-3 / 200)
+    model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+
+    print("[INFO] model summary...")
+    print(model.summary())
+
+    # simple early stopping
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
+    mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
+    # fit model
+    print("[INFO] training model...")
+    history = model.fit(
+        [trainAudioX_pe, trainAudioX_re], trainY,
+        validation_data=([valAudioX_pe, valAudioX_re], valY),
+        epochs=5, batch_size=16, verbose=0, callbacks=[es, mc])
+
+    # evaluate the model
+    _, train_acc = model.evaluate([trainAudioX_pe, trainAudioX_re], trainY, verbose=0)
+    _, val_acc = model.evaluate([valAudioX_pe, valAudioX_re], valY, verbose=0)
+    _, test_acc = model.evaluate([testAudioX_pe, testAudioX_re], testY, verbose=0)
+
+    print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
+
+
+def run_info_text():
+    # create the MLP and CNN models
+    print("[INFO] building model...")
+    mlp = th_16_model_justice.create_mlp(trainAttrX.shape[1], regress=False)
+    cnn_pe = th_16_model_justice.create_cnn(num_words=num_words, max_length=MAX_LENGTH,
+                                            embedding_dim=EMBEDDING_DIM, embedding_matrix=embedding_matrix, regress=False)
+    cnn_re = th_16_model_justice.create_cnn(num_words=num_words, max_length=MAX_LENGTH,
+                                            embedding_dim=EMBEDDING_DIM, embedding_matrix=embedding_matrix, regress=False)
+
+    # create the input to our final set of layers as the *output* of both
+    # the MLP and CNN
+    combinedInput = concatenate([mlp.output, cnn_pe.output, cnn_re.output])
+
+    # our final FC layer head will have two dense layers, the final one
+    # being our regression head
+    x = Dense(4, activation='relu')(combinedInput)
+    x = Dense(1, activation='sigmoid')(x)
+
+    # build model
+    model = Model(inputs=[mlp.input, cnn_pe.input, cnn_re.input], outputs=x)
+
+    # compile the model using mean absolute percentage error as our loss
+    opt = Adam(lr=1e-3, decay=1e-3 / 200)
+    model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+
+    print("[INFO] model summary...")
+    print(model.summary())
+
+    # simple early stopping
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
+    mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
+    # fit model
+    print("[INFO] training model...")
+    history = model.fit(
+        [trainAttrX, trainTextX_pe, trainTextX_re], trainY,
+        validation_data=([valAttrX, valTextX_pe, valTextX_re], valY),
+        epochs=5, batch_size=16, verbose=0, callbacks=[es, mc])
+
+    # evaluate the model
+    _, train_acc = model.evaluate([trainAttrX, trainTextX_pe, trainTextX_re], trainY, verbose=0)
+    _, val_acc = model.evaluate([valAttrX, valTextX_pe, valTextX_re], valY, verbose=0)
+    _, test_acc = model.evaluate([testAttrX, testTextX_pe, testTextX_re], testY, verbose=0)
+
+    print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
+
+
+def run_info_audio():
+    print("[INFO] building model...")
+    mlp = th_16_model_justice.create_mlp(trainAttrX.shape[1], regress=False)
+    mlp_pe = th_16_model_justice.create_mlp_audio(1, regress=False)
+    mlp_re = th_16_model_justice.create_mlp_audio(1, regress=False)
+
+    combinedInput = concatenate([mlp.output, mlp_pe.output, mlp_re.output])
+
+    x = Dense(4, activation='relu')(combinedInput)
+    x = Dense(1, activation='sigmoid')(x)
+
+    # build model
+    model = Model(inputs=[mlp.input, mlp_pe.input, mlp_re.input], outputs=x)
+
+    # compile the model using mean absolute percentage error as our loss
+    opt = Adam(lr=1e-3, decay=1e-3 / 200)
+    model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+
+    print("[INFO] model summary...")
+    print(model.summary())
+
+    # simple early stopping
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
+    mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
+    # fit model
+    print("[INFO] training model...")
+    history = model.fit(
+        [trainAttrX, trainAudioX_pe, trainAudioX_re], trainY,
+        validation_data=([valAttrX, valAudioX_pe, valAudioX_re], valY),
+        epochs=5, batch_size=16, verbose=0, callbacks=[es, mc])
+
+    # evaluate the model
+    _, train_acc = model.evaluate([trainAttrX, trainAudioX_pe, trainAudioX_re], trainY, verbose=0)
+    _, val_acc = model.evaluate([valAttrX, valAudioX_pe, valAudioX_re], valY, verbose=0)
+    _, test_acc = model.evaluate([testAttrX, testAudioX_pe, testAudioX_re], testY, verbose=0)
+
+    print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
+
+
+def run_text_audio():
+    # create the MLP and CNN models
+    print("[INFO] building model...")
+    cnn_pe = th_16_model_justice.create_cnn(num_words=num_words, max_length=MAX_LENGTH,
+                                            embedding_dim=EMBEDDING_DIM, embedding_matrix=embedding_matrix, regress=False)
+    cnn_re = th_16_model_justice.create_cnn(num_words=num_words, max_length=MAX_LENGTH,
+                                            embedding_dim=EMBEDDING_DIM, embedding_matrix=embedding_matrix, regress=False)
+    mlp_pe = th_16_model_justice.create_mlp_audio(1, regress=False)
+    mlp_re = th_16_model_justice.create_mlp_audio(1, regress=False)
+
+    # create the input to our final set of layers as the *output* of both
+    # the MLP and CNN
+    combinedInput = concatenate([cnn_pe.output, cnn_re.output, mlp_pe.output, mlp_re.output])
+
+    # our final FC layer head will have two dense layers, the final one
+    # being our regression head
+    x = Dense(4, activation='relu')(combinedInput)
+    x = Dense(1, activation='sigmoid')(x)
+
+    # build model
+    model = Model(inputs=[cnn_pe.input, cnn_re.input, mlp_pe.input, mlp_re.input], outputs=x)
+
+    # compile the model using mean absolute percentage error as our loss
+    opt = Adam(lr=1e-3, decay=1e-3 / 200)
+    model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+
+    print("[INFO] model summary...")
+    print(model.summary())
+
+    # simple early stopping
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
+    mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
+    # fit model
+    print("[INFO] training model...")
+    history = model.fit(
+        [trainTextX_pe, trainTextX_re, trainAudioX_pe, trainAudioX_re], trainY,
+        validation_data=([valTextX_pe, valTextX_re, valAudioX_pe, valAudioX_re], valY),
+        epochs=5, batch_size=16, verbose=0, callbacks=[es, mc])
+
+    # evaluate the model
+    _, train_acc = model.evaluate([trainTextX_pe, trainTextX_re, trainAudioX_pe, trainAudioX_re], trainY, verbose=0)
+    _, val_acc = model.evaluate([valTextX_pe, valTextX_re, valAudioX_pe, valAudioX_re], valY, verbose=0)
+    _, test_acc = model.evaluate([testTextX_pe, testTextX_re, testAudioX_pe, testAudioX_re], testY, verbose=0)
+
+    print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
+
+
+def run_info_text_audio():
+    # create the MLP and CNN models
+    print("[INFO] building model...")
+    mlp = th_16_model_justice.create_mlp(trainAttrX.shape[1], regress=False)
+    cnn_pe = th_16_model_justice.create_cnn(num_words=num_words, max_length=MAX_LENGTH,
+                                            embedding_dim=EMBEDDING_DIM, embedding_matrix=embedding_matrix, regress=False)
+    cnn_re = th_16_model_justice.create_cnn(num_words=num_words, max_length=MAX_LENGTH,
+                                            embedding_dim=EMBEDDING_DIM, embedding_matrix=embedding_matrix, regress=False)
+    mlp_pe = th_16_model_justice.create_mlp_audio(1, regress=False)
+    mlp_re = th_16_model_justice.create_mlp_audio(1, regress=False)
+
+    # create the input to our final set of layers as the *output* of both
+    # the MLP and CNN
+    combinedInput = concatenate([mlp.output, cnn_pe.output, cnn_re.output, mlp_pe.output, mlp_re.output])
+
+    # our final FC layer head will have two dense layers, the final one
+    # being our regression head
+    x = Dense(4, activation='relu')(combinedInput)
+    x = Dense(1, activation='sigmoid')(x)
+
+    # build model
+    model = Model(inputs=[mlp.input, cnn_pe.input, cnn_re.input, mlp_pe.input, mlp_re.input], outputs=x)
+
+    # compile the model using mean absolute percentage error as our loss
+    opt = Adam(lr=1e-3, decay=1e-3 / 200)
+    model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+
+    print("[INFO] model summary...")
+    print(model.summary())
+
+    # simple early stopping
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
+    mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
+    # fit model
+    print("[INFO] training model...")
+    history = model.fit(
+        [trainAttrX, trainTextX_pe, trainTextX_re, trainAudioX_pe, trainAudioX_re], trainY,
+        validation_data=([valAttrX, valTextX_pe, valTextX_re, valAudioX_pe, valAudioX_re], valY),
+        epochs=5, batch_size=16, verbose=0, callbacks=[es, mc])
+
+    # evaluate the model
+    _, train_acc = model.evaluate([trainAttrX, trainTextX_pe, trainTextX_re, trainAudioX_pe, trainAudioX_re], trainY, verbose=0)
+    _, val_acc = model.evaluate([valAttrX, valTextX_pe, valTextX_re, valAudioX_pe, valAudioX_re], valY, verbose=0)
+    _, test_acc = model.evaluate([testAttrX, testTextX_pe, testTextX_re, testAudioX_pe, testAudioX_re], testY, verbose=0)
+
+    print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
+
+
+run_info_text_audio()

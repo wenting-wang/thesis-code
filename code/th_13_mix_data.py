@@ -8,24 +8,35 @@ from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 
 
-# 3506 cases
-
+# load text, info, audio data, in [docket] order
 
 def load_arguments_text(info_file, text_dir, max_num_words, max_length):
+    # '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/text_data_justice_filtered'
+    # 3506 cases
     case_info = pd.read_csv(info_file)
+    docket = case_info['docket']
+    docket = docket.sort_values()  # sort, order
+    docket = docket.to_list()  # filter
+
     arguments_petitioner = []
     arguments_respondent = []
 
     # all cases in order, follow csv data
-    for docket in case_info.docket.values:
-        pe_path = os.path.join(text_dir, '{}_petitioner'.format(docket))
-        re_path = os.path.join(text_dir, '{}_respondent'.format(docket))
+    for id in docket:
+        pe_path = os.path.join(text_dir, '{}_petitioner'.format(id))
+        re_path = os.path.join(text_dir, '{}_respondent'.format(id))
 
-        with open(pe_path, 'r', encoding='utf-8') as f:
-            text = f.read()
+        try:
+            with open(pe_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+        except IOError:
+            text = ''
         arguments_petitioner.append(text)
-        with open(re_path, 'r', encoding='utf-8') as f:
-            text = f.read()
+        try:
+            with open(re_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+        except IOError:
+            text = ''
         arguments_respondent.append(text)
 
     petitioner_len = len(arguments_petitioner)
@@ -53,8 +64,11 @@ def load_arguments_text(info_file, text_dir, max_num_words, max_length):
 # process data
 # fill NA with 0
 def load_structured_data(info_file):
-    # '/home/wenting/PycharmProjects/thesis/data/mixed_data/caseinfo.csv'
+    # (3506->1000, 601), 600 svd features + 1 target
+    # '/home/wenting/PycharmProjects/thesis/data/mixed_data/caseinfo_filtered.csv'
     info = pd.read_csv(info_file)
+    info = info.drop(['dateDecision', 'dateArgument', 'dateRearg'], axis=1)
+    info = info.sort_values(by=['docket'])  # sort, order
     info = info.fillna(0)
 
     # one-hot-encoding
@@ -77,12 +91,9 @@ def load_structured_data(info_file):
     features = info_encoded.drop(['docket', 'partyWinning'], axis=1)
     target = info_encoded['partyWinning']
 
-    # first, try without date
-    features = features.drop(['dateDecision', 'dateArgument'], axis=1)   # (3506, 1488)
-
     svd = TruncatedSVD(n_components=600, random_state=42)
     features_reduced = svd.fit_transform(features)
-    # print(svd.explained_variance_ratio_.sum())  # 0.96
+    # print(svd.explained_variance_ratio_.sum())  # 0.962033
     features_reduced = pd.DataFrame(features_reduced)
 
     info_processed = pd.concat([features_reduced, target], axis=1)
@@ -119,3 +130,14 @@ def load_structured_data(info_file):
 # # evaluate predictions
 # accuracy = accuracy_score(y_test, predictions)
 # print("Accuracy: %.2f%%" % (accuracy * 100.0))  # 63.96%
+
+
+def load_audio_data(audio_file):
+    # 111 cases
+    # '/home/wenting/PycharmProjects/thesis/data/mixed_data/audio_filtered.csv'
+    audio = pd.read_csv(audio_file)
+    audio = audio.sort_values(by=['docket'])  # sort, order
+
+    return audio[['petitioner_pitch', 'respondent_pitch']]
+
+

@@ -79,9 +79,20 @@ def get_text():
 # info file has duplicated items. drop them. now use 'case_info_justice_filtered' as filter! (5158!!!)
 
 
-def get_info():
+def get_audio_filtered():
+    # get 'audio_filtered.csv'
     caseinfo_jusctice = pd.read_csv(project_path + 'data/mixed_data_justice/caseinfo_justice.csv')
     justice_results = pd.read_csv(project_path + 'data/mixed_data_justice/justice_results.csv', sep='\t')
+    audio_filter = justice_results[['docket', 'justice']]  # filter
+
+    audio_filtered = pd.merge(audio_filter, caseinfo_jusctice, on=['docket', 'justice'], how='left')
+    audio_filtered = audio_filtered.drop_duplicates(['docket', 'justice'], keep=False)
+    audio_filtered.to_csv(project_path + 'data/mixed_data_justice/audio_filtered.csv', index=False)
+
+
+def get_info_filtered():
+    caseinfo_jusctice = pd.read_csv(project_path + 'data/mixed_data_justice/caseinfo_justice.csv')
+    justice_results = pd.read_csv(project_path + 'data/mixed_data_justice/audio_filtered.csv', sep='\t')
     docket_justice_filter = justice_results[['docket', 'justice', 'petitioner_vote']]  # filter
 
     # get 'case_info_justice_filtered.csv'
@@ -89,19 +100,8 @@ def get_info():
     caseinfo_jusctice_new = caseinfo_jusctice_new.drop_duplicates(['docket', 'justice'], keep=False)
     caseinfo_jusctice_new.to_csv(project_path + 'data/mixed_data_justice/case_info_justice_filtered.csv', index=False)
 
-
-def get_audio_filtered():
-    # get 'audio_filtered.csv'
-    caseinfo_jusctice = pd.read_csv(project_path + 'data/mixed_data_justice/caseinfo_justice.csv')
-    justice_results = pd.read_csv(project_path + 'data/mixed_data_justice/justice_results.csv', sep='\t')
-    caseinfo_jusctice = caseinfo_jusctice[['docket', 'justice']]  # filter
-
-    audio_filtered = pd.merge(justice_results, caseinfo_jusctice, on=['docket', 'justice'], how='left')
-    audio_filtered = audio_filtered.drop_duplicates(['docket', 'justice'], keep=False)
-    audio_filtered.to_csv(project_path + 'data/mixed_data_justice/audio_filtered.csv', index=False)
-
-# get_info()
 # get_audio_filtered()
+# get_info_filtered()
 
 
 """ code 3, get text file justice level, filtered by audio and info >> text_data_justice_filtered """

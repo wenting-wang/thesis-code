@@ -16,7 +16,7 @@ from keras.preprocessing.sequence import pad_sequences
 # load text, info, audio data, in [docket_justice] order
 
 def load_arguments_text(info_file, text_dir, max_num_words, max_length):
-    # '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/case_info_justice_filtered.csv'
+
     justice_results = pd.read_csv(info_file)
     docket_justice_id = justice_results['docket'].map(str) + '_' + justice_results['justice'].map(str)
     docket_justice_id = docket_justice_id.sort_values()  # sort, order
@@ -99,7 +99,7 @@ def load_structured_data(info_file):
     target = info_encoded['petitioner_vote']
 
     # first, try without date
-    features = features.drop(['dateDecision', 'dateArgument'], axis=1)   # (5158, 1078)
+    features = features.drop(['dateDecision', 'dateArgument', 'dateRearg'], axis=1)   # (5158, 1078)
 
     svd = TruncatedSVD(n_components=600, random_state=42)
     features_reduced = svd.fit_transform(features)

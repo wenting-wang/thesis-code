@@ -1,0 +1,9 @@
+Justice level,,,,
+"Data (0.64,0.16,0.2)",model,train,validation,test
+info,64+32+16 FC,0.822,0.712,0.69
+text,32CON1D+5MAXPOOL+16GRU,0.569,0.545,0.528
+audio,2+1 FC,0.554,0.542,0.518
+Info + text,,0.878,0.712,0.702
+Info + audio,,0.818,0.715,0.696
+Text + audio,,0.634,0.523,0.53
+Info + text + audio,,0.905,0.722,0.698

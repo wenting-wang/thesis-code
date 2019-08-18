@@ -30,8 +30,6 @@ model_info = load_model('/home/wenting/PycharmProjects/thesis/model/mixed_model_
 model_text = load_model('/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model_text.h5')
 model_audio = load_model('/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model_audio.h5')
 
-
-
 # remove the last layer of each model
 # freeze all layers before the last layer
 # concatenate three model

@@ -12,7 +12,7 @@ from keras.layers import concatenate
 import sys
 sys.path.append('/home/wenting/PycharmProjects/thesis/code')
 import os
-import th_17_mix_data_justice
+import th_13_mix_data
 import th_16_model_justice
 import numpy as np
 import pandas as pd
@@ -26,14 +26,10 @@ from keras.callbacks import ModelCheckpoint
 from keras.models import load_model
 
 # load model
-model_info = load_model('/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model_info.h5')
-model_text = load_model('/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model_text.h5')
-model_audio = load_model('/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model_audio.h5')
+model_info = load_model('/home/wenting/PycharmProjects/thesis/model/mixed_model/best_model_info.h5')
+model_text = load_model('/home/wenting/PycharmProjects/thesis/model/mixed_model/best_model_text.h5')
+model_audio = load_model('/home/wenting/PycharmProjects/thesis/model/mixed_model/best_model_audio.h5')
 
-# remove the last layer of each model
-# freeze all layers before the last layer
-# concatenate three model
-# add new decision layer, and train with aligned data
 
 for layer in model_info.layers[:-1]:
     layer.trainable = False
@@ -59,7 +55,7 @@ for i, layer in enumerate(model_audio.layers):
     print(i, layer.name, layer.trainable)
 
 
-# load and prepare data
+
 # embedding settings
 MAX_NUM_WORDS = 20000
 MAX_LENGTH = 400  # change
@@ -71,23 +67,26 @@ GLOVE_DIR = os.path.join(BASE_DIR, 'glove.6B')  # glove.6B
 # from keras.models import load_model
 # saved_model = load_model('best_model.h5')
 
+"""decision fusion"""
+info_file = '/home/wenting/PycharmProjects/thesis/data/mixed_data/caseinfo_original.csv'
+
+
 
 # load data
-info_file = '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/case_info_justice_filtered.csv'
-arguments_file_dir = '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/text_data_justice_filtered'
-audio_file = '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/audio_filtered.csv'
+# info_file = '/home/wenting/PycharmProjects/thesis/data/mixed_data/caseinfo_filtered.csv'
+arguments_file_dir = '/home/wenting/PycharmProjects/thesis/data/mixed_data/text_data_filtered'
+audio_file = '/home/wenting/PycharmProjects/thesis/data/mixed_data/audio_filtered.csv'
 
 print("[INFO] loading cases attributes csv...")
-info_processed = th_17_mix_data_justice.load_structured_data(info_file)
+info_processed = th_13_mix_data.load_structured_data(info_file)
 
 print("[INFO] loading audio pitch...")
-audio = th_17_mix_data_justice.load_audio_data(audio_file)
+audio = th_13_mix_data.load_audio_data(audio_file)
 info_and_audio = pd.concat([info_processed, audio], axis=1)
 
 print("[INFO] loading oral arguments text...")
-oral_data = th_17_mix_data_justice.load_arguments_text(info_file, arguments_file_dir, MAX_NUM_WORDS, MAX_LENGTH)
+oral_data = th_13_mix_data.load_arguments_text(info_file, arguments_file_dir, MAX_NUM_WORDS, MAX_LENGTH)
 texts_pad, word_index = oral_data
-
 
 # GloVe embedding preparing
 # indexing word vectors
@@ -110,12 +109,12 @@ for word, i in word_index.items():
         # words not found in embedding index will be all-zeros.
         embedding_matrix[i] = embedding_vector
 
-
 # split data
-# train, val, test: 0.79, 0.11, 0.1
+# train, val, test: 0.64, 0.16, 0.2
 print("[INFO] processing data...")
-trainAttrX, testAttrX, trainTextX, testTextX = train_test_split(info_and_audio, texts_pad, test_size=0.1, random_state=1)
-trainAttrX, valAttrX, trainTextX, valTextX = train_test_split(trainAttrX, trainTextX, test_size=0.1, random_state=1)
+trainAttrX, testAttrX, trainTextX, testTextX = train_test_split(info_and_audio, texts_pad, test_size=0.2,
+                                                                random_state=1)
+trainAttrX, valAttrX, trainTextX, valTextX = train_test_split(trainAttrX, trainTextX, test_size=0.2, random_state=1)
 
 # text
 trainTextX_pe = trainTextX[:, :, 0]
@@ -126,9 +125,9 @@ valTextX_pe = valTextX[:, :, 0]
 valTextX_re = valTextX[:, :, 1]
 
 # target
-trainY = trainAttrX['petitioner_vote']
-testY = testAttrX['petitioner_vote']
-valY = valAttrX['petitioner_vote']
+trainY = trainAttrX['partyWinning'].astype(int)
+testY = testAttrX['partyWinning'].astype(int)
+valY = valAttrX['partyWinning'].astype(int)
 
 # audio
 trainAudioX_pe = trainAttrX['petitioner_pitch']
@@ -139,9 +138,9 @@ valAudioX_pe = valAttrX['petitioner_pitch']
 valAudioX_re = valAttrX['respondent_pitch']
 
 # structured data
-trainAttrX = trainAttrX.drop(['petitioner_vote', 'petitioner_pitch', 'respondent_pitch'], axis=1)
-testAttrX = testAttrX.drop(['petitioner_vote', 'petitioner_pitch', 'respondent_pitch'], axis=1)
-valAttrX = valAttrX.drop(['petitioner_vote', 'petitioner_pitch', 'respondent_pitch'], axis=1)
+trainAttrX = trainAttrX.drop(['partyWinning', 'petitioner_pitch', 'respondent_pitch'], axis=1)
+testAttrX = testAttrX.drop(['partyWinning', 'petitioner_pitch', 'respondent_pitch'], axis=1)
+valAttrX = valAttrX.drop(['partyWinning', 'petitioner_pitch', 'respondent_pitch'], axis=1)
 
 
 def info_text():
@@ -163,7 +162,7 @@ def info_text():
     print(model.summary())
 
     # simple early stopping
-    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model_fine.h5'
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model/best_model_fine.h5'
     es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
     mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
     # fit model
@@ -198,7 +197,7 @@ def info_audio():
     print(model.summary())
 
     # simple early stopping
-    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model/best_model_fine.h5'
     es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
     mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
     # fit model
@@ -235,7 +234,7 @@ def text_audio():
     print(model.summary())
 
     # simple early stopping
-    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model/best_model_fine.h5'
     es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
     mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
     # fit model
@@ -272,7 +271,7 @@ def info_text_audio():
     print(model.summary())
 
     # simple early stopping
-    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model/best_model_fine.h5'
     es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
     mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
     # fit model
@@ -289,3 +288,5 @@ def info_text_audio():
 
     print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
 
+
+info_text_audio()

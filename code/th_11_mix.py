@@ -26,6 +26,10 @@ GLOVE_DIR = os.path.join(BASE_DIR, 'glove.6B')  # glove.6B
 # from keras.models import load_model
 # saved_model = load_model('best_model.h5')
 
+"""decision fusion"""
+# info_file = '/home/wenting/PycharmProjects/thesis/data/mixed_data/caseinfo_original.csv'
+
+
 
 # load data
 info_file = '/home/wenting/PycharmProjects/thesis/data/mixed_data/caseinfo_filtered.csv'
@@ -135,7 +139,7 @@ def run_info():
     print(model.summary())
 
     # simple early stopping
-    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model/best_model_info.h5'
     es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
     mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
     # fit model
@@ -181,7 +185,7 @@ def run_text():
     print(model.summary())
 
     # simple early stopping
-    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model/best_model_text.h5'
     es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
     mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
     # fit model
@@ -221,7 +225,7 @@ def run_audio():
     print(model.summary())
 
     # simple early stopping
-    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model/best_model_audio.h5'
     es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
     mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
     # fit model
@@ -425,5 +429,9 @@ def run_info_text_audio():
                                  verbose=0)
 
     print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
+
+print(texts_pad.shape)
+
+run_audio()
 
 

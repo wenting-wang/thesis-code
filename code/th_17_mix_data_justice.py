@@ -59,6 +59,64 @@ def load_arguments_text(info_file, text_dir, max_num_words, max_length):
     return texts_pad, word_index
 
 
+def load_arguments_text_orig(text_dir, max_num_words, max_length):
+
+    arguments_petitioner = []
+    arguments_respondent = []
+    index = []
+
+    for root, dirs, files in os.walk(text_dir):
+        for file in files:
+            index.append(file)
+    index.sort()
+
+    index_num = []
+    for id in index:
+        id = id[:-11]
+        index_num.append(id)
+    index_num = list(set(index_num))
+    index_num.sort()
+
+    case_info = pd.read_csv('/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/caseinfo_justice.csv')
+    case_id = case_info['docket'].map(str) + '_' + case_info['justice'].map(str)
+    case_info['id'] = case_id
+    text_id = pd.DataFrame({'id': index_num})
+    target = pd.merge(text_id, case_info[['id', 'partyWinning']], on=['id'], how='left')
+
+    for id in index_num:
+        pe_path = os.path.join(text_dir, '{}_petitioner'.format(id))
+        re_path = os.path.join(text_dir, '{}_respondent'.format(id))
+
+        try:
+            with open(pe_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+        except IOError:
+            text = ''
+        arguments_petitioner.append(text)
+
+        try:
+            with open(re_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+        except IOError:
+            text = ''
+        arguments_respondent.append(text)
+
+    petitioner_len = len(arguments_petitioner)
+    texts = arguments_petitioner + arguments_respondent
+
+    # vectoring
+    tokenizer = Tokenizer(num_words=max_num_words)
+    tokenizer.fit_on_texts(texts)
+    sequences = tokenizer.texts_to_sequences(texts)
+    word_index = tokenizer.word_index  # len(word_index) unique tokens
+    # padding
+    texts_pad = pad_sequences(sequences, maxlen=max_length)
+    # texts_pad[0] is petitioner arguments, texts_pad[1] is respondent arguments
+    texts_pad = np.dstack((texts_pad[:petitioner_len], texts_pad[petitioner_len:]))  # (5209, 200, 2)
+
+    return texts_pad, word_index, target[['partyWinning']]
+
+
 # # load data
 # mix_data_path = '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/'
 # info_path = mix_data_path + 'case_info_justice_filtered.csv'
@@ -83,12 +141,12 @@ def load_structured_data(info_file):
         if info[col].dtype == np.float64:
             info[col] = info[col].astype(np.int64)
 
-    cat_columns = ['decisionType', 'naturalCourt', 'term',
+    cat_columns = ['naturalCourt', 'term',
                    'chief', 'petitioner', 'petitionerState',
                    'respondent', 'respondentState', 'jurisdiction', 'adminAction',
                    'adminActionState', 'threeJudgeFdc', 'caseOrigin', 'caseOriginState',
                    'caseSource', 'caseSourceState', 'lcDisagreement', 'certReason',
-                   'declarationUncon', 'issue', 'issueArea', 'lawType', 'lawSupp']
+                   'issue', 'issueArea']
 
     info_encoded = pd.get_dummies(info, columns=cat_columns, prefix_sep='_')
     # cat_dummies = [col for col in info_processed if '_' in col and col.split('_')[0] in cat_columns]
@@ -99,7 +157,45 @@ def load_structured_data(info_file):
     target = info_encoded['petitioner_vote']
 
     # first, try without date
-    features = features.drop(['dateDecision', 'dateArgument', 'dateRearg'], axis=1)   # (5158, 1078)
+    features = features.drop(['dateDecision', 'dateArgument'], axis=1)   # (5158, 1078)
+
+    svd = TruncatedSVD(n_components=600, random_state=42)
+    features_reduced = svd.fit_transform(features)
+    # print(svd.explained_variance_ratio_.sum())  # 0.993
+    features_reduced = pd.DataFrame(features_reduced)
+
+    info_processed = pd.concat([features_reduced, target], axis=1)
+
+    return info_processed
+
+
+def load_structured_data_orig(info_file):
+    # '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/caseinfo_justice.csv'
+    info = pd.read_csv(info_file)
+    info = info.fillna(0)
+
+    # one-hot-encoding
+    for col in info.columns:
+        if info[col].dtype == np.float64:
+            info[col] = info[col].astype(np.int64)
+
+    cat_columns = ['naturalCourt', 'term',
+                   'chief', 'petitioner', 'petitionerState',
+                   'respondent', 'respondentState', 'jurisdiction', 'adminAction',
+                   'adminActionState', 'threeJudgeFdc', 'caseOrigin', 'caseOriginState',
+                   'caseSource', 'caseSourceState', 'lcDisagreement', 'certReason',
+                   'issue', 'issueArea', 'lawType', 'lawSupp']
+
+    info_encoded = pd.get_dummies(info, columns=cat_columns, prefix_sep='_')
+    # cat_dummies = [col for col in info_processed if '_' in col and col.split('_')[0] in cat_columns]
+    # processed_columns = list(info_processed.columns[:])  # save the orders (1492 columns)
+
+    # SVD
+    features = info_encoded.drop(['docket', 'justice', 'partyWinning'], axis=1)
+    target = info_encoded['partyWinning']
+
+    # first, try without date
+    features = features.drop(['dateDecision', 'dateArgument'], axis=1)   # (5158, 1078)
 
     svd = TruncatedSVD(n_components=600, random_state=42)
     features_reduced = svd.fit_transform(features)

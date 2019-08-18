@@ -31,6 +31,26 @@ info_file = '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/case_i
 arguments_file_dir = '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/text_data_justice_filtered'
 audio_file = '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/audio_filtered.csv'
 
+
+# """ decision-level fusion BEGIN"""
+# ### decision fusion, load original file (file before alignment), info
+# info_file_orig = '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/caseinfo_justice.csv'
+# info_processed = th_17_mix_data_justice.load_structured_data_orig(info_file_orig)
+# Y = info_processed['partyWinning']
+# X = info_processed.drop(['partyWinning'], axis=1)
+# # split
+# trainAttrX, testAttrX, trainY, testY = train_test_split(X, Y, test_size=0.2, random_state=1)
+# trainAttrX, valAttrX, trainY, valY = train_test_split(trainAttrX, trainY, test_size=0.2, random_state=1)
+#
+# ### decision fusion, load original file (file before alignment), text
+# arguments_file_dir_orig = '/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/text_data_justice'
+# oral_data = th_17_mix_data_justice.load_arguments_text_orig(arguments_file_dir_orig, MAX_NUM_WORDS, MAX_LENGTH)
+# texts_pad, word_index, Y = oral_data
+#
+#
+# """ decision-level fusion FINISH"""
+
+
 print("[INFO] loading cases attributes csv...")
 info_processed = th_17_mix_data_justice.load_structured_data(info_file)
 
@@ -98,6 +118,38 @@ testAttrX = testAttrX.drop(['petitioner_vote', 'petitioner_pitch', 'respondent_p
 valAttrX = valAttrX.drop(['petitioner_vote', 'petitioner_pitch', 'respondent_pitch'], axis=1)
 
 
+
+# """for decision fusion"""
+# # for text
+# # split
+# trainTextX, testTextX, trainY, testY = train_test_split(texts_pad, Y, test_size=0.2, random_state=1)
+# trainTextX, valTextX, trainY, valY = train_test_split(trainTextX, trainY, test_size=0.2, random_state=1)
+# # text
+# trainTextX_pe = trainTextX[:, :, 0]
+# trainTextX_re = trainTextX[:, :, 1]
+# testTextX_pe = testTextX[:, :, 0]
+# testTextX_re = testTextX[:, :, 1]
+# valTextX_pe = valTextX[:, :, 0]
+# valTextX_re = valTextX[:, :, 1]
+
+
+
+# for prediction on case level
+TextX_pe = texts_pad[:, :, 0]
+TextX_re = texts_pad[:, :, 1]
+AudioX_pe = info_and_audio['petitioner_pitch']
+AudioX_re = info_and_audio['respondent_pitch']
+y = info_and_audio['petitioner_vote']
+AttrX = info_and_audio.drop(['petitioner_vote', 'petitioner_pitch', 'respondent_pitch'], axis=1)
+
+
+# for prediction on case level, decision-level fusion
+# TextX_pe = texts_pad[:, :, 0]
+# TextX_re = texts_pad[:, :, 1]
+# AudioX_pe = info_and_audio['petitioner_pitch']
+# AudioX_re = info_and_audio['respondent_pitch']
+
+
 def draw_graph():
     plt.clf()
     loss = history.history['loss']
@@ -150,6 +202,15 @@ def run_info():
     _, val_acc = model.evaluate(valAttrX, valY, verbose=0)
     _, test_acc = model.evaluate(testAttrX, testY, verbose=0)
 
+    y_pred = model.predict(X)
+    y_pred = pd.DataFrame(y_pred)
+    y_pred[y_pred <= 0.5] = 0
+    y_pred[y_pred > 0.5] = 1
+    # y_pred.to_csv('/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/pre_info.csv', index=False)
+
+    # decision-fusion
+    y_pred.to_csv('/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/pre_info.csv', index=False)
+
     print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
 
 
@@ -181,7 +242,7 @@ def run_text():
     print(model.summary())
 
     # simple early stopping
-    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model_text.h5'
     es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
     mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
     # fit model
@@ -197,6 +258,12 @@ def run_text():
     _, test_acc = model.evaluate([testTextX_pe, testTextX_re], testY, verbose=0)
 
     print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
+
+    y_pred = model.predict([TextX_pe, TextX_re])
+    y_pred = pd.DataFrame(y_pred)
+    y_pred[y_pred <= 0.5] = 0
+    y_pred[y_pred > 0.5] = 1
+    y_pred.to_csv('/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/de_pre_text.csv', index=False)
 
 
 def run_audio():
@@ -221,7 +288,7 @@ def run_audio():
     print(model.summary())
 
     # simple early stopping
-    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model.h5'
+    best_model = '/home/wenting/PycharmProjects/thesis/model/mixed_model_justice/best_model_audio.h5'
     es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=20)
     mc = ModelCheckpoint(best_model, monitor='val_acc', mode='max', verbose=1, save_best_only=True)
     # fit model
@@ -235,6 +302,12 @@ def run_audio():
     _, train_acc = model.evaluate([trainAudioX_pe, trainAudioX_re], trainY, verbose=0)
     _, val_acc = model.evaluate([valAudioX_pe, valAudioX_re], valY, verbose=0)
     _, test_acc = model.evaluate([testAudioX_pe, testAudioX_re], testY, verbose=0)
+
+    y_pred = model.predict([AudioX_pe, AudioX_re])
+    y_pred = pd.DataFrame(y_pred)
+    y_pred[y_pred <= 0.5] = 0
+    y_pred[y_pred > 0.5] = 1
+    y_pred.to_csv('/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/de_pre_audio.csv', index=False)
 
     print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
 
@@ -283,6 +356,12 @@ def run_info_text():
     _, val_acc = model.evaluate([valAttrX, valTextX_pe, valTextX_re], valY, verbose=0)
     _, test_acc = model.evaluate([testAttrX, testTextX_pe, testTextX_re], testY, verbose=0)
 
+    y_pred = model.predict([AttrX, TextX_pe, TextX_re])
+    y_pred = pd.DataFrame(y_pred)
+    y_pred[y_pred <= 0.5] = 0
+    y_pred[y_pred > 0.5] = 1
+    y_pred.to_csv('/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/pre_info_text.csv', index=False)
+
     print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
 
 
@@ -322,6 +401,12 @@ def run_info_audio():
     _, train_acc = model.evaluate([trainAttrX, trainAudioX_pe, trainAudioX_re], trainY, verbose=0)
     _, val_acc = model.evaluate([valAttrX, valAudioX_pe, valAudioX_re], valY, verbose=0)
     _, test_acc = model.evaluate([testAttrX, testAudioX_pe, testAudioX_re], testY, verbose=0)
+
+    y_pred = model.predict([AttrX, AudioX_pe, AudioX_re])
+    y_pred = pd.DataFrame(y_pred)
+    y_pred[y_pred <= 0.5] = 0
+    y_pred[y_pred > 0.5] = 1
+    y_pred.to_csv('/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/pre_info_audio.csv', index=False)
 
     print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
 
@@ -370,6 +455,12 @@ def run_text_audio():
     _, train_acc = model.evaluate([trainTextX_pe, trainTextX_re, trainAudioX_pe, trainAudioX_re], trainY, verbose=0)
     _, val_acc = model.evaluate([valTextX_pe, valTextX_re, valAudioX_pe, valAudioX_re], valY, verbose=0)
     _, test_acc = model.evaluate([testTextX_pe, testTextX_re, testAudioX_pe, testAudioX_re], testY, verbose=0)
+
+    y_pred = model.predict([TextX_pe, TextX_re, AudioX_pe, AudioX_re])
+    y_pred = pd.DataFrame(y_pred)
+    y_pred[y_pred <= 0.5] = 0
+    y_pred[y_pred > 0.5] = 1
+    y_pred.to_csv('/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/pre_text_audio.csv', index=False)
 
     print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
 
@@ -420,7 +511,13 @@ def run_info_text_audio():
     _, val_acc = model.evaluate([valAttrX, valTextX_pe, valTextX_re, valAudioX_pe, valAudioX_re], valY, verbose=0)
     _, test_acc = model.evaluate([testAttrX, testTextX_pe, testTextX_re, testAudioX_pe, testAudioX_re], testY, verbose=0)
 
+    y_pred = model.predict([AttrX, TextX_pe, TextX_re, AudioX_pe, AudioX_re])
+    y_pred = pd.DataFrame(y_pred)
+    y_pred[y_pred <= 0.5] = 0
+    y_pred[y_pred > 0.5] = 1
+    y_pred.to_csv('/home/wenting/PycharmProjects/thesis/data/mixed_data_justice/pre_info_text_audio.csv', index=False)
+
     print('Train: %.3f, Validation: %.3f, Test: %.3f' % (train_acc, val_acc, test_acc))
 
 
-run_info_text_audio()
+# run_info_text_audio()

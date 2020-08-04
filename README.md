@@ -6,7 +6,7 @@ Contact Info: wenting.wang.cd@outlook.com
 
 --
 
-Wenting
+Wenting Wang
 
 M.Sc. Social and Economic Data Science
 

@@ -12,8 +12,6 @@ Multimodal Deep Learning; Legal Technology; Court Decision Prediction
 
 Wenting Wang
 
-M.Sc. Social and Economic Data Science
-
 University Konstanz, Germany
 
 Contact Info: wenting.wang.cd@outlook.com
